@@ -1,0 +1,32 @@
+# This file is used to specify files and directories that should be ignored by Docker when building images.
+# It is similar to .gitignore but specific to Docker.
+*.pyc
+*.pyo
+*.mo
+*.db
+*.css.map
+*.egg-info
+*.sql.gz
+.cache
+.project
+.idea
+.pydevproject
+.idea/workspace.xml
+.DS_Store
+.git/
+.sass-cache
+.vagrant/
+__pycache__
+dist
+docs
+env
+venv
+logs
+.env
+db.sqlite3
+.venv
+node_modules
+.pytest_cache
+htmlcov
+.coverage
+*.log
