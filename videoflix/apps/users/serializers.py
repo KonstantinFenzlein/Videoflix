@@ -43,3 +43,17 @@ class UserDetailSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ('id', 'email', 'first_name', 'last_name', 'is_email_verified')
         read_only_fields = ('id', 'is_email_verified')
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    # Validiert die E-Mail-Adresse für die Passwort-Reset-Anforderung.
+    email = serializers.EmailField()
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    # Validiert das neue Passwort und dessen Bestätigung.
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True, min_length=8)
+
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError({'confirm_password': 'Bitte überprüfe deine Eingaben und versuche es erneut.'})
+        return data
