@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CustomUser, ActivationToken, TokenBlacklist
+from .models import CustomUser, ActivationToken, TokenBlacklist, PasswordResetToken
 
 @admin.register(CustomUser)
 class CustomUserAdmin(admin.ModelAdmin):
@@ -12,6 +12,14 @@ class CustomUserAdmin(admin.ModelAdmin):
 @admin.register(ActivationToken)
 class ActivationTokenAdmin(admin.ModelAdmin):
     # Konfiguriert die Admin-Oberfläche für Aktivierungstoken-Verwaltung.
+    list_display = ('user', 'is_valid', 'created_at', 'expires_at')
+    list_filter = ('created_at', 'expires_at')
+    search_fields = ('user__email',)
+    readonly_fields = ('token', 'created_at')
+
+@admin.register(PasswordResetToken)
+class PasswordResetTokenAdmin(admin.ModelAdmin):
+    # Konfiguriert die Admin-Oberfläche für Passwort-Reset-Token-Verwaltung.
     list_display = ('user', 'is_valid', 'created_at', 'expires_at')
     list_filter = ('created_at', 'expires_at')
     search_fields = ('user__email',)
