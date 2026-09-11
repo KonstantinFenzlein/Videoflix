@@ -48,6 +48,33 @@ class ActivationToken(models.Model):
     def __str__(self):
         return f"Token for {self.user.email}"
 
+class PasswordResetToken(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='password_reset_token')
+    token = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        db_table = 'password_reset_token'
+        verbose_name = 'Password Reset Token'
+        verbose_name_plural = 'Password Reset Tokens'
+
+    def is_valid(self):
+        return timezone.now() < self.expires_at
+
+    @classmethod
+    def create_token(cls, user):
+        token = secrets.token_urlsafe(32)
+        expires_at = timezone.now() + timedelta(hours=1)
+        password_reset_token, _ = cls.objects.update_or_create(
+            user=user,
+            defaults={'token': token, 'expires_at': expires_at}
+        )
+        return token
+
+    def __str__(self):
+        return f"Password reset token for {self.user.email}"
+
 class TokenBlacklist(models.Model):
     token = models.TextField(unique=True)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='blacklisted_tokens')
