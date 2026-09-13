@@ -1,7 +1,7 @@
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_200_OK
+from rest_framework.status import HTTP_201_CREATED, HTTP_400_BAD_REQUEST, HTTP_200_OK, HTTP_401_UNAUTHORIZED
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.utils.encoding import force_str, force_bytes
 from django.contrib.auth import authenticate
@@ -9,9 +9,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.exceptions import TokenError
 from django.utils import timezone
 from datetime import datetime
-from .serializers import UserRegistrationSerializer, UserLoginSerializer
-from .models import ActivationToken, CustomUser, TokenBlacklist
-from videoflix.utils.email import send_verification_email
+from .serializers import UserRegistrationSerializer, UserLoginSerializer, PasswordResetRequestSerializer, PasswordResetConfirmSerializer
+from .models import ActivationToken, CustomUser, TokenBlacklist, PasswordResetToken
+from videoflix.utils.email import send_verification_email, send_password_reset_email
 
 class RegisterView(APIView):
     permission_classes = [AllowAny]
@@ -115,21 +115,21 @@ class RefreshTokenView(APIView):
         refresh_token = request.COOKIES.get('refresh_token')
         if not refresh_token:
             return Response(
-                {'error': 'Refresh token nicht gefunden.'},
+                {'detail': 'Refresh-Token fehlt.'},
                 status=HTTP_400_BAD_REQUEST
             )
 
         if TokenBlacklist.objects.filter(token=refresh_token).exists():
             return Response(
-                {'error': 'Ungültiger oder abgelaufener Refresh Token.'},
-                status=HTTP_400_BAD_REQUEST
+                {'detail': 'Ungültiger Refresh-Token.'},
+                status=HTTP_401_UNAUTHORIZED
             )
 
         try:
             refresh = RefreshToken(refresh_token)
             response_data = {
-                'detail': 'Token refreshed successfully',
-                'user': {'id': refresh.get('user_id')}
+                'detail': 'Token refreshed',
+                'access': str(refresh.access_token)
             }
             response = Response(response_data, status=HTTP_200_OK)
             response.set_cookie(
@@ -143,9 +143,63 @@ class RefreshTokenView(APIView):
             return response
         except Exception as e:
             return Response(
-                {'error': 'Ungültiger oder abgelaufener Refresh Token.'},
-                status=HTTP_400_BAD_REQUEST
+                {'detail': 'Ungültiger Refresh-Token.'},
+                status=HTTP_401_UNAUTHORIZED
             )
+
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        # Sendet einen Passwort-Reset-Link an die E-Mail des Benutzers.
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            try:
+                user = CustomUser.objects.get(email=email)
+                token = PasswordResetToken.create_token(user)
+                uidb64 = urlsafe_base64_encode(force_bytes(user.id))
+                reset_link = f"{request.build_absolute_uri('/api/auth/reset-password')}/{uidb64}/{token}/"
+                send_password_reset_email(user, reset_link)
+            except CustomUser.DoesNotExist:
+                pass
+
+            return Response(
+                {'detail': 'An email has been sent to reset your password.'},
+                status=HTTP_200_OK
+            )
+        return Response(serializer.errors, status=HTTP_400_BAD_REQUEST)
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, uidb64, token):
+        # Bestätigt die Passwortänderung mit dem Token aus der E-Mail.
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=HTTP_400_BAD_REQUEST)
+
+        try:
+            user_id = force_str(urlsafe_base64_decode(uidb64))
+            user = CustomUser.objects.get(id=user_id)
+        except (CustomUser.DoesNotExist, ValueError):
+            return Response({'error': 'Ungültiger Benutzer.'}, status=HTTP_400_BAD_REQUEST)
+
+        try:
+            password_reset_token = PasswordResetToken.objects.get(user=user, token=token)
+            if not password_reset_token.is_valid():
+                return Response({'error': 'Token abgelaufen.'}, status=HTTP_400_BAD_REQUEST)
+
+            user.set_password(serializer.validated_data['new_password'])
+            user.save()
+            password_reset_token.delete()
+
+            return Response(
+                {'detail': 'Your Password has been successfully reset.'},
+                status=HTTP_200_OK
+            )
+        except PasswordResetToken.DoesNotExist:
+            return Response({'error': 'Ungültiger Token.'}, status=HTTP_400_BAD_REQUEST)
 
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
