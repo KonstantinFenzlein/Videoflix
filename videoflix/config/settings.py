@@ -139,6 +139,7 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 12,
+    'EXCEPTION_HANDLER': 'videoflix.apps.videos.handlers.custom_exception_handler',
 }
 
 # JWT Token Konfiguration mit 15-Minuten Lebensdauer für Access- und 7-Tage für Refresh-Tokens
@@ -164,3 +165,28 @@ EMAIL_USE_TLS = getenv('EMAIL_USE_TLS', 'True', cast=lambda x: x.lower() in ('tr
 EMAIL_HOST_USER = getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = getenv('DEFAULT_FROM_EMAIL', 'noreply@videoflix.de')
+
+# Logging Konfiguration für Video-Streaming und API-Überwachung
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'videoflix.apps.videos': {
+            'handlers': ['console'],
+            'level': getenv('DJANGO_LOG_LEVEL', 'INFO'),
+            'propagate': True,
+        },
+    },
+}
